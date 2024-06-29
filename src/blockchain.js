@@ -1,4 +1,6 @@
 const SHA256 = require('crypto-js/sha256')
+const EC = require('elliptic').ec;
+const ec = new EC('secp256k1');
 
 
 class Transaction {
@@ -7,6 +9,32 @@ class Transaction {
         this.toAddress = toAddress;
         this.amount = amount;
     }
+
+    calculateHash() {
+        return SHA256(this.fromAddress + this.toAddress + this.amount).toString();
+    }
+
+    signTransaction(signingKey) {
+        if(signingKey.getPublic('hex') !== this.fromAddress) {
+            throw new Error('You cannot sign transactions for other wallets')
+        }
+
+        const hashTx = this.calculateHash();
+        const sig = signingKey.sign(hashTx, 'base64')
+        this.signature = sig.toDER('hex');
+    }
+
+    isValid() {
+        if(this.fromAddress == null) return true; // for transaction from mining
+        if(!this.signature || this.signature.length === 0) {
+            throw new Error('No signature in this transaction');
+        }
+
+        const publicKey = ec.keyFromPublic(this.fromAddress, 'hex');
+        return publicKey.verify(this.calculateHash(), this.signature);
+        
+    }
+
 }
 
 
@@ -30,6 +58,16 @@ class Block{
         }
 
         console.log("Block mined: " + this.hash);
+    }
+
+    hasValidTransactions() {
+        for(const tx of this.transactions) {
+            if(!tx.isValid()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 
@@ -62,7 +100,15 @@ class Blockchain {
         ];
     }
 
-    createTransaction(transaction) {
+    addTransaction(transaction) {
+
+        if(!transaction.fromAddress || !transaction.toAddress) {
+            throw new Error('Transaction must include from and to address')
+        }
+        if(!transaction.isValid()) {
+            throw new Error('Cannot add invalid transaction to chain')
+        }
+
         this.pendingTransactions.push(transaction);
     }
 
@@ -93,6 +139,9 @@ class Blockchain {
             console.log(currentBlock)
             //console.log(currentBlock.hash)
 
+            if(!currentBlock.hasValidTransactions()) {
+                return false;
+            }
 
             if(currentBlock.hash !== currentBlock.calculateHash()) {
                 return false;

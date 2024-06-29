@@ -1,14 +1,25 @@
 const {Blockchain, Transaction} = require('./blockchain')
+const EC = require('elliptic').ec;
+const ec = new EC('secp256k1');
+
+const myKey = ec.keyFromPrivate('ff976c0fc13c4a05af94087b0e917d9ce1e36daabe0456b80c7f7a82b5394696')
+const myWalletAddress = myKey.getPublic('hex')
 
 let newCoin = new Blockchain();
 
-newCoin.createTransaction(new Transaction('address1', 'address2', 100));
-newCoin.createTransaction(new Transaction('address2', 'address1', 50));
+const tx1 = new Transaction(myWalletAddress, 'public key goes here', 10);
+tx1.signTransaction(myKey);
+newCoin.addTransaction(tx1);
+
+
+
+//newCoin.createTransaction(new Transaction('address1', 'address2', 100));
+//newCoin.createTransaction(new Transaction('address2', 'address1', 50));
 
 console.log('\n Starting the miner...')
-newCoin.minePendingTransactions('miner1-address');
+newCoin.minePendingTransactions(myWalletAddress);
 
-console.log('\nBalance of miner1-address is ', newCoin.getBalanceOfAddress('miner1-address'));
+console.log('\nBalance of miner1-address is ', newCoin.getBalanceOfAddress(myWalletAddress));
 
 
 //console.log('Mining block 1...')
